@@ -1,0 +1,12 @@
+{
+  "appId": "com.telaadm.app",
+  "appName": "Paineladm",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 3000,
+      "backgroundColor": "#FFFFFF"
+    }
+  }
+}

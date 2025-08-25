@@ -1,0 +1,1708 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ilumina Barcarena - Painel de Administração</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    <!-- Chart.js para o dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .call-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s;
+        }
+
+        .call-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .status-button.active {
+            font-weight: bold;
+        }
+
+        .nav-link.active {
+            @apply text-yellow-400;
+        }
+
+        .admin-badge {
+            @apply text-xs font-semibold px-2 py-1 rounded-full;
+        }
+
+        .super-admin {
+            @apply bg-purple-100 text-purple-800;
+        }
+
+        .normal-admin {
+            @apply bg-blue-100 text-blue-800;
+        }
+
+        .photo-thumbnail {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .photo-thumbnail:hover {
+            transform: scale(1.05);
+        }
+
+        .photo-modal {
+            max-width: 90%;
+            max-height: 90%;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, .3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-gray-800 text-white shadow-lg p-4 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center flex-shrink-0">
+            <i class="fas fa-lightbulb text-yellow-400 text-3xl mr-2"></i>
+            <span class="text-lg sm:text-xl font-bold">ILUMINA BARCARENA</span>
+        </div>
+        <nav class="flex flex-wrap items-center gap-2 sm:space-x-6">
+            <button id="show-calls-panel"
+                class="nav-link text-base sm:text-lg font-medium hover:text-gray-400 transition-colors duration-300">
+                <i class="fas fa-list-check mr-2"></i> Chamados
+            </button>
+            <button id="show-admins-panel"
+                class="nav-link text-base sm:text-lg font-medium hover:text-gray-400 transition-colors duration-300">
+                <i class="fas fa-users-cog mr-2"></i> Administradores
+            </button>
+            <button id="show-dashboard-panel"
+                class="nav-link text-base sm:text-lg font-medium hover:text-gray-400 transition-colors duration-300">
+                <i class="fas fa-chart-bar mr-2"></i> Dashboard
+            </button>
+            <button id="show-electricians-panel"
+                class="nav-link text-base sm:text-lg font-medium hover:text-gray-400 transition-colors duration-300">
+                <i class="fas fa-user-hard-hat mr-2"></i> Eletricistas
+            </button>
+        </nav>
+        <div class="flex items-center space-x-4">
+            <span id="current-user-role" class="hidden admin-badge super-admin"></span>
+            <button id="logout-btn" class="cursor-pointer hover:text-gray-400 transition-colors duration-300">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8 flex-grow">
+        <!-- PAINEL DE CHAMADOS -->
+        <div id="calls-panel">
+            <section
+                class="main-title-section text-center bg-gradient-to-r from-green-500 to-red-400 text-white p-5 rounded-lg mb-6 shadow-lg">
+                <h1 class="text-3xl font-bold">PAINEL DE CHAMADOS</h1>
+            </section>
+
+            <!-- Filtros -->
+            <section class="filters-section flex flex-col md:flex-row justify-between gap-4 mb-6">
+                <div class="filter-item bg-white p-4 rounded-lg shadow-md flex-1">
+                    <label for="status-filter" class="block text-gray-700 font-medium mb-2">STATUS</label>
+                    <select id="status-filter"
+                        class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="todos">Todos</option>
+                        <option value="concluido">Concluído</option>
+                        <option value="em-andamento">Em andamento</option>
+                        <option value="pendente">Pendente</option>
+                    </select>
+                </div>
+                <div class="filter-item bg-white p-4 rounded-lg shadow-md flex-1">
+                    <label for="type-filter" class="block text-gray-700 font-medium mb-2">TIPO</label>
+                    <select id="type-filter"
+                        class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="todos">Todos</option>
+                        <option value="Luminária apagada">Lâmpada apagada</option>
+                        <option value="Luminária piscando">Luminária piscando</option>
+                        <option value="Luminária acesa 24h">Luminária acesa 24h</option>
+                        <option value="Luminária quebrada">Luminária quebrada</option>
+                        <option value="Suporte da Luminária quebrado">Suporte quebrado</option>
+                        <option value="Luminária sem alimentação elétrica">Sem energia</option>
+                        <option value="Poste sem Luminária">Poste sem luminária</option>
+                        <option value="Poste sem rede de baixa tensão">Sem rede BT</option>
+                        <option value="Rua escura">Rua escura</option>
+                        <option value="Rua sem Poste">Rua sem poste</option>
+                    </select>
+                </div>
+                <div class="filter-item bg-white p-4 rounded-lg shadow-md flex-1 flex items-end">
+                    <button id="clear-concluidos-btn"
+                        class="w-full bg-red-500 text-white font-semibold py-2 px-4 rounded-full shadow-lg hover:bg-red-600 transition-colors duration-300">
+                        Limpar Concluídos
+                    </button>
+                </div>
+            </section>
+
+            <!-- Lista de Chamados -->
+            <section id="calls-list-container" class="space-y-4">
+                <!-- Chamados serão adicionados aqui pelo JS -->
+            </section>
+        </div>
+
+        <!-- GERENCIAR ADMINISTRADORES -->
+        <div id="admins-panel" class="hidden">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Gerenciar Administradores</h1>
+
+            <!-- Botão para Adicionar Administrador -->
+            <div id="showAddAdminForm" class="flex justify-center mb-6">
+                <button
+                    class="bg-green-500 text-white font-semibold py-3 px-6 rounded-full shadow-lg hover:bg-green-600 transition-colors duration-300 flex items-center">
+                    <i class="fas fa-plus mr-2"></i> Adicionar Novo Administrador
+                </button>
+            </div>
+
+            <!-- Formulário para Adicionar Administrador -->
+            <div id="addAdminForm" class="hidden bg-white p-6 rounded-xl shadow-lg mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Adicionar Novo Administrador</h2>
+                <form id="adminForm">
+                    <div class="mb-4">
+                        <label for="admin-name" class="block text-gray-700 font-medium mb-2">Nome</label>
+                        <input type="text" id="admin-name"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="admin-email" class="block text-gray-700 font-medium mb-2">Email</label>
+                        <input type="email" id="admin-email"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="admin-role" class="block text-gray-700 font-medium mb-2">Tipo de Acesso</label>
+                        <select id="admin-role"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="normal">Administrador Normal</option>
+                            <option value="super">Super Administrador</option>
+                        </select>
+                    </div>
+                    <div class="mb-6">
+                        <label for="admin-password" class="block text-gray-700 font-medium mb-2">Senha (mínimo 6
+                            caracteres)</label>
+                        <input type="password" id="admin-password"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required minlength="6">
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" id="cancelAddAdmin"
+                            class="bg-gray-400 text-white font-medium py-2 px-6 rounded-full hover:bg-gray-500 transition-colors duration-300">Cancelar</button>
+                        <button type="submit"
+                            class="bg-blue-600 text-white font-medium py-2 px-6 rounded-full hover:bg-blue-700 transition-colors duration-300">Salvar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Lista de Administradores -->
+            <section class="admin-list bg-white rounded-xl shadow-lg p-6">
+                <div id="admin-list-container">
+                    <!-- Administradores serão adicionados aqui pelo JS -->
+                </div>
+            </section>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div id="dashboard-panel" class="hidden">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Dashboard de Estatísticas</h1>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-bold mb-4">Status dos Chamados</h2>
+                    <canvas id="statusChart"></canvas>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h2 class="text-xl font-bold mb-4">Tipos de Chamados</h2>
+                    <canvas id="typeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <h2 class="text-xl font-bold mb-4">Atividade Recente</h2>
+                <div id="recent-activity" class="space-y-4">
+                    <!-- Atividades serão adicionadas aqui -->
+                </div>
+            </div>
+        </div>
+
+        <!-- GERENCIAR ELETRICISTAS -->
+        <div id="electricians-panel" class="hidden">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Gerenciar Eletricistas</h1>
+
+            <!-- Botão para Adicionar Eletricista -->
+            <div id="showAddElectricianForm" class="flex justify-center mb-6">
+                <button
+                    class="bg-green-500 text-white font-semibold py-3 px-6 rounded-full shadow-lg hover:bg-green-600 transition-colors duration-300 flex items-center">
+                    <i class="fas fa-plus mr-2"></i> Adicionar Novo Eletricista
+                </button>
+            </div>
+
+            <!-- Formulário para Adicionar Eletricista -->
+            <div id="addElectricianForm" class="hidden bg-white p-6 rounded-xl shadow-lg mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Adicionar Novo Eletricista</h2>
+                <form id="electricianForm">
+                    <div class="mb-4">
+                        <label for="electrician-name" class="block text-gray-700 font-medium mb-2">Nome</label>
+                        <input type="text" id="electrician-name"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="electrician-email" class="block text-gray-700 font-medium mb-2">Email</label>
+                        <input type="email" id="electrician-email"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="electrician-phone" class="block text-gray-700 font-medium mb-2">Telefone</label>
+                        <input type="tel" id="electrician-phone"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="electrician-password" class="block text-gray-700 font-medium mb-2">Senha (mínimo 6
+                            caracteres)</label>
+                        <input type="password" id="electrician-password"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required minlength="6">
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" id="cancelAddElectrician"
+                            class="bg-gray-400 text-white font-medium py-2 px-6 rounded-full hover:bg-gray-500 transition-colors duration-300">Cancelar</button>
+                        <button type="submit"
+                            class="bg-blue-600 text-white font-medium py-2 px-6 rounded-full hover:bg-blue-700 transition-colors duration-300">Salvar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Lista de Eletricistas -->
+            <section class="electrician-list bg-white rounded-xl shadow-lg p-6">
+                <div id="electrician-list-container">
+                    <!-- Eletricistas serão adicionados aqui pelo JS -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modal de Edição de Chamado -->
+    <div id="editCallModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4">Editar Chamado</h3>
+            <form id="editCallForm">
+                <input type="hidden" id="edit-call-id">
+                <div class="mb-4">
+                    <label for="edit-call-description" class="block text-gray-700 font-medium mb-2">Descrição</label>
+                    <input type="text" id="edit-call-description"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required>
+                </div>
+                <div class="mb-4">
+                    <label for="edit-call-address" class="block text-gray-700 font-medium mb-2">Endereço</label>
+                    <input type="text" id="edit-call-address"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required>
+                </div>
+                <div class="mb-4">
+                    <label for="edit-call-details" class="block text-gray-700 font-medium mb-2">Detalhes</label>
+                    <textarea id="edit-call-details"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows="3"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="edit-call-led-number" class="block text-gray-700 font-medium mb-2">Número do LED</label>
+                    <input type="text" id="edit-call-led-number"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2">Fotos do Problema</label>
+                    <div id="call-photos-container" class="grid grid-cols-2 gap-2 mb-2">
+                        <!-- Fotos serão adicionadas aqui -->
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label for="edit-call-type" class="block text-gray-700 font-medium mb-2">Tipo</label>
+                    <select id="edit-call-type"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Luminária apagada">Lâmpada apagada</option>
+                        <option value="Luminária piscando">Luminária piscando</option>
+                        <option value="Luminária acesa 24h">Luminária acesa 24h</option>
+                        <option value="Luminária quebrada">Luminária quebrada</option>
+                        <option value="Suporte da Luminária quebrado">Suporte quebrado</option>
+                        <option value="Luminária sem alimentação elétrica">Sem energia</option>
+                        <option value="Poste sem Luminária">Poste sem luminária</option>
+                        <option value="Poste sem rede de baixa tensão">Sem rede BT</option>
+                        <option value="Rua escura">Rua escura</option>
+                        <option value="Rua sem Poste">Rua sem poste</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="edit-call-status" class="block text-gray-700 font-medium mb-2">Status</label>
+                    <select id="edit-call-status"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="pendente">Pendente</option>
+                        <option value="em-andamento">Em andamento</option>
+                        <option value="concluido">Concluído</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="electrician-assignment" class="block text-gray-700 font-medium mb-2">Atribuir a
+                        Eletricista</label>
+                    <select id="electrician-assignment"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Selecione um eletricista</option>
+                        <!-- Eletricistas serão carregados aqui -->
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="notification-message" class="block text-gray-700 font-medium mb-2">Mensagem para
+                        Eletricista</label>
+                    <textarea id="notification-message"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows="3" placeholder="Digite uma mensagem para o eletricista..."></textarea>
+                </div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="cancelEditCall"
+                        class="bg-gray-400 text-white font-medium py-2 px-6 rounded-full hover:bg-gray-500 transition-colors duration-300">Cancelar</button>
+                    <button type="button" id="sendNotificationBtn"
+                        class="bg-yellow-500 text-white font-medium py-2 px-6 rounded-full hover:bg-yellow-600 transition-colors duration-300">
+                        <i class="fas fa-bell mr-2"></i> Notificar
+                    </button>
+                    <button type="submit"
+                        class="bg-blue-600 text-white font-medium py-2 px-6 rounded-full hover:bg-blue-700 transition-colors duration-300">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização de Foto -->
+    <div id="photoModal" class="fixed inset-0 bg-black bg-opacity-75 hidden items-center justify-center z-50">
+        <div class="relative">
+            <img id="modalPhoto" src="" alt="Foto ampliada" class="photo-modal">
+            <button id="closePhotoModal" class="absolute top-4 right-4 text-white text-3xl">&times;</button>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação (para chamados) -->
+    <div id="confirmCallsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 shadow-xl w-80">
+            <h3 class="text-xl font-bold mb-4">Confirmação</h3>
+            <p id="confirmCallsMessage" class="mb-6">Tem certeza que deseja limpar todos os chamados concluídos?</p>
+            <div class="flex justify-end space-x-4">
+                <button id="cancelCallsAction"
+                    class="bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-full hover:bg-gray-400">Cancelar</button>
+                <button id="confirmCallsAction"
+                    class="bg-red-600 text-white font-medium py-2 px-4 rounded-full hover:bg-red-700">Limpar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação (para administradores) -->
+    <div id="confirmAdminsModal"
+        class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 shadow-xl w-80">
+            <h3 class="text-xl font-bold mb-4">Confirmação</h3>
+            <p id="confirmAdminsMessage" class="mb-6">Tem certeza que deseja excluir este administrador?</p>
+            <div class="flex justify-end space-x-4">
+                <button id="cancelDelete"
+                    class="bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-full hover:bg-gray-400">Cancelar</button>
+                <button id="confirmDelete"
+                    class="bg-red-600 text-white font-medium py-2 px-4 rounded-full hover:bg-red-700">Excluir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação (para eletricistas) -->
+    <div id="confirmElectriciansModal"
+        class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 shadow-xl w-80">
+            <h3 class="text-xl font-bold mb-4">Confirmação</h3>
+            <p id="confirmElectriciansMessage" class="mb-6">Tem certeza que deseja excluir este eletricista?</p>
+            <div class="flex justify-end space-x-4">
+                <button id="cancelElectricianDelete"
+                    class="bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-full hover:bg-gray-400">Cancelar</button>
+                <button id="confirmElectricianDelete"
+                    class="bg-red-600 text-white font-medium py-2 px-4 rounded-full hover:bg-red-700">Excluir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Login -->
+    <div id="loginModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 shadow-xl w-80">
+            <h3 class="text-xl font-bold mb-4 text-center">Login Administrador</h3>
+            <form id="loginForm">
+                <div class="mb-4">
+                    <label for="login-email" class="block text-gray-700 font-medium mb-2">Email</label>
+                    <input type="email" id="login-email"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required>
+                </div>
+                <div class="mb-6">
+                    <label for="login-password" class="block text-gray-700 font-medium mb-2">Senha</label>
+                    <input type="password" id="login-password"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required>
+                </div>
+                <div id="login-error" class="text-red-500 text-sm mb-4 hidden"></div>
+                <div class="flex justify-between items-center">
+                    <button type="button" id="forgot-password" class="text-blue-600 hover:underline text-sm">
+                        Esqueci minha senha
+                    </button>
+                    <button type="submit" id="login-submit"
+                        class="bg-blue-600 text-white font-medium py-2 px-6 rounded-full hover:bg-blue-700 transition-colors duration-300 flex items-center justify-center">
+                        <span id="login-text">Entrar</span>
+                        <span id="login-spinner" class="loading hidden ml-2"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Recuperação de Senha -->
+    <div id="recoveryModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 shadow-xl w-80">
+            <h3 class="text-xl font-bold mb-4">Recuperar Senha</h3>
+            <input type="email" id="recovery-email" placeholder="Seu email"
+                class="w-full px-4 py-2 border rounded-lg mb-4">
+            <div id="recovery-error" class="text-red-500 text-sm mb-4 hidden"></div>
+            <div class="flex justify-between">
+                <button id="cancelRecovery" class="bg-gray-300 px-4 py-2 rounded-lg">Cancelar</button>
+                <button id="sendRecovery" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Enviar Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mensagem de Alerta Personalizada -->
+    <div id="alertMessage"
+        class="fixed top-4 left-1/2 -translate-x-1/2 hidden p-4 text-white rounded-lg shadow-lg z-50">
+        <p id="alertText"></p>
+    </div>
+
+    <script>
+        // Configuração do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCp3qvImqD--LTJd24EhJUgIihJrqiq2q4",
+            authDomain: "appiluminabc.firebaseapp.com",
+            databaseURL: "https://appiluminabc-default-rtdb.firebaseio.com",
+            projectId: "appiluminabc",
+            storageBucket: "appiluminabc.firebasestorage.app",
+            messagingSenderId: "133885635496",
+            appId: "1:133885635496:web:22a9bc657f6d47a78c0b9d",
+            measurementId: "G-8PFD5WYDZV"
+        };
+
+        // Inicialize o Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+        const storage = firebase.storage();
+
+        // Variáveis globais
+        let currentUserRole = 'normal';
+        let statusChart, typeChart;
+        let electriciansList = [];
+
+        // Função para criar admin padrão se não existir nenhum
+        async function createDefaultAdmin() {
+            try {
+                const snapshot = await database.ref('administradores').once('value');
+
+                if (!snapshot.exists()) {
+                    console.log("Criando administrador padrão...");
+
+                    const defaultAdmin = {
+                        email: "admin@iluminabc.com",
+                        password: "SenhaPadrao123",
+                        name: "Administrador Padrão",
+                        role: "super"
+                    };
+
+                    // Cria o usuário no Authentication
+                    const userCredential = await auth.createUserWithEmailAndPassword(
+                        defaultAdmin.email,
+                        defaultAdmin.password
+                    );
+
+                    // Adiciona no Realtime Database
+                    const newAdminRef = database.ref('administradores').push();
+                    await newAdminRef.set({
+                        name: defaultAdmin.name,
+                        email: defaultAdmin.email,
+                        role: defaultAdmin.role,
+                        createdAt: firebase.database.ServerValue.TIMESTAMP,
+                        isDefault: true
+                    });
+
+                    console.log("Admin padrão criado com sucesso!");
+                    return true;
+                } else {
+                    console.log("Administradores já existem no banco de dados");
+                    return true;
+                }
+            } catch (error) {
+                console.error("Erro ao verificar/criar admin padrão:", error);
+                // Não impede o login se houver erro na criação
+                return true;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Primeiro, criar o admin padrão se necessário
+            await createDefaultAdmin();
+
+            // Elementos da UI
+            const loginModal = document.getElementById('loginModal');
+            const loginForm = document.getElementById('loginForm');
+            const loginError = document.getElementById('login-error');
+            const loginSubmit = document.getElementById('login-submit');
+            const loginText = document.getElementById('login-text');
+            const loginSpinner = document.getElementById('login-spinner');
+            const logoutBtn = document.getElementById('logout-btn');
+            const forgotPasswordBtn = document.getElementById('forgot-password');
+            const recoveryModal = document.getElementById('recoveryModal');
+            const cancelRecoveryBtn = document.getElementById('cancelRecovery');
+            const sendRecoveryBtn = document.getElementById('sendRecovery');
+            const recoveryError = document.getElementById('recovery-error');
+
+            const panels = {
+                calls: document.getElementById('calls-panel'),
+                admins: document.getElementById('admins-panel'),
+                dashboard: document.getElementById('dashboard-panel'),
+                electricians: document.getElementById('electricians-panel')
+            };
+
+            const panelButtons = {
+                calls: document.getElementById('show-calls-panel'),
+                admins: document.getElementById('show-admins-panel'),
+                dashboard: document.getElementById('show-dashboard-panel'),
+                electricians: document.getElementById('show-electricians-panel')
+            };
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const currentUserRoleBadge = document.getElementById('current-user-role');
+
+            // Verificar estado de autenticação
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    // Usuário logado
+                    loginModal.classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+
+                    try {
+                        // Verificar se é admin
+                        const adminRef = database.ref('administradores');
+                        const snapshot = await adminRef.once('value');
+
+                        if (snapshot.exists()) {
+                            const admins = snapshot.val();
+                            let isAdmin = false;
+
+                            // Procura o usuário atual na lista de administradores
+                            for (const adminId in admins) {
+                                if (admins[adminId].email === user.email) {
+                                    isAdmin = true;
+                                    currentUserRole = admins[adminId].role || 'normal';
+
+                                    // Mostrar badge de perfil
+                                    currentUserRoleBadge.textContent = currentUserRole === 'super' ? 'Super Admin' : 'Admin';
+                                    currentUserRoleBadge.classList.remove('hidden');
+                                    currentUserRoleBadge.classList.remove('normal-admin', 'super-admin');
+                                    currentUserRoleBadge.classList.add(currentUserRole === 'super' ? 'super-admin' : 'normal-admin');
+
+                                    console.log("Usuário autenticado como:", currentUserRole);
+                                    break;
+                                }
+                            }
+
+                            if (!isAdmin) {
+                                console.log("Usuário não é administrador");
+                                await auth.signOut();
+                                showAlert('Acesso permitido apenas para administradores', 'error');
+                                return;
+                            }
+                        } else {
+                            console.log("Nenhum administrador encontrado no banco de dados");
+                            await auth.signOut();
+                            showAlert('Nenhum administrador cadastrado no sistema', 'error');
+                            return;
+                        }
+                    } catch (error) {
+                        console.error("Erro ao verificar permissões:", error);
+                        showAlert('Erro ao verificar permissões de administrador', 'error');
+                        await auth.signOut();
+                        return;
+                    }
+
+                    loadAdminData();
+                    loadElectriciansData();
+                    loadCallsData();
+                    switchPanel('calls');
+                } else {
+                    // Usuário não logado
+                    loginModal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                    currentUserRoleBadge.classList.add('hidden');
+                }
+            });
+
+            // Função para alternar entre os painéis
+            function switchPanel(panelToShow) {
+                // Esconde todos os painéis
+                Object.values(panels).forEach(panel => panel.classList.add('hidden'));
+
+                // Remove a classe active de todos os botões
+                navLinks.forEach(link => link.classList.remove('active'));
+
+                // Mostra o painel selecionado
+                panels[panelToShow].classList.remove('hidden');
+                panelButtons[panelToShow].classList.add('active');
+
+                // Atualiza o dashboard se for selecionado
+                if (panelToShow === 'dashboard') {
+                    updateDashboardCharts();
+                }
+            }
+
+            // Event listeners para os botões do header
+            panelButtons.calls.addEventListener('click', () => switchPanel('calls'));
+            panelButtons.admins.addEventListener('click', () => {
+                if (currentUserRole === 'super') {
+                    switchPanel('admins');
+                } else {
+                    showAlert('Apenas Super Administradores podem acessar esta área', 'error');
+                }
+            });
+            panelButtons.dashboard.addEventListener('click', () => switchPanel('dashboard'));
+            panelButtons.electricians.addEventListener('click', () => {
+                if (currentUserRole === 'super') {
+                    switchPanel('electricians');
+                } else {
+                    showAlert('Apenas Super Administradores podem acessar esta área', 'error');
+                }
+            });
+
+            // Recuperação de senha
+            forgotPasswordBtn.addEventListener('click', () => {
+                loginModal.classList.add('hidden');
+                recoveryModal.classList.remove('hidden');
+            });
+
+            cancelRecoveryBtn.addEventListener('click', () => {
+                recoveryModal.classList.add('hidden');
+                loginModal.classList.remove('hidden');
+            });
+
+            sendRecoveryBtn.addEventListener('click', async () => {
+                const email = document.getElementById('recovery-email').value;
+                try {
+                    await auth.sendPasswordResetEmail(email);
+                    showAlert('Link de recuperação enviado para seu email!');
+                    recoveryModal.classList.add('hidden');
+                    loginModal.classList.remove('hidden');
+                } catch (error) {
+                    recoveryError.textContent = error.message;
+                    recoveryError.classList.remove('hidden');
+                }
+            });
+
+            // Formulário de login
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+
+                // Mostrar loading
+                loginText.classList.add('hidden');
+                loginSpinner.classList.remove('hidden');
+                loginSubmit.disabled = true;
+
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
+                    loginError.classList.add('hidden');
+                } catch (error) {
+                    loginError.textContent = error.message;
+                    loginError.classList.remove('hidden');
+                } finally {
+                    // Esconder loading
+                    loginText.classList.remove('hidden');
+                    loginSpinner.classList.add('hidden');
+                    loginSubmit.disabled = false;
+                }
+            });
+
+            // Logout
+            logoutBtn.addEventListener('click', () => {
+                auth.signOut();
+            });
+
+            // Função para mostrar alertas
+            function showAlert(message, type = 'success') {
+                const alertMessage = document.getElementById('alertMessage');
+                const alertText = document.getElementById('alertText');
+
+                alertText.textContent = message;
+                alertMessage.className = `fixed top-4 left-1/2 -translate-x-1/2 p-4 text-white rounded-lg shadow-lg transition-transform transform-gpu duration-300 ease-in-out z-50`;
+
+                if (type === 'success') {
+                    alertMessage.classList.add('bg-green-500', 'translate-y-0');
+                } else {
+                    alertMessage.classList.add('bg-red-500', 'translate-y-0');
+                }
+
+                setTimeout(() => {
+                    alertMessage.classList.remove('translate-y-0');
+                    alertMessage.classList.add('-translate-y-20');
+                    setTimeout(() => {
+                        alertMessage.classList.add('hidden');
+                    }, 300);
+                }, 3000);
+                alertMessage.classList.remove('hidden');
+            }
+
+            // ==================== PAINEL DE CHAMADOS ====================
+            const statusFilter = document.getElementById('status-filter');
+            const typeFilter = document.getElementById('type-filter');
+            const clearConcluidosBtn = document.getElementById('clear-concluidos-btn');
+            const callsListContainer = document.getElementById('calls-list-container');
+            const confirmCallsModal = document.getElementById('confirmCallsModal');
+            const confirmCallsActionBtn = document.getElementById('confirmCallsAction');
+            const cancelCallsActionBtn = document.getElementById('cancelCallsAction');
+            const editCallModal = document.getElementById('editCallModal');
+            const editCallForm = document.getElementById('editCallForm');
+            const cancelEditCallBtn = document.getElementById('cancelEditCall');
+            const sendNotificationBtn = document.getElementById('sendNotificationBtn');
+            const photoModal = document.getElementById('photoModal');
+            const modalPhoto = document.getElementById('modalPhoto');
+            const closePhotoModal = document.getElementById('closePhotoModal');
+
+            const statusMap = {
+                'concluido': { text: 'Concluído', bg: 'bg-green-100', textClass: 'text-green-600', border: 'border-green-600', hover: 'hover:bg-green-200' },
+                'em-andamento': { text: 'Em andamento', bg: 'bg-yellow-100', textClass: 'text-yellow-600', border: 'border-yellow-600', hover: 'hover:bg-yellow-200' },
+                'pendente': { text: 'Pendente', bg: 'bg-red-100', textClass: 'text-red-600', border: 'border-red-600', hover: 'hover:bg-red-200' },
+            };
+
+            // Função para obter a URL da foto do Storage
+            async function getPhotoUrlFromStorage(photoPath) {
+                try {
+                    // Se já é uma URL completa, retorna diretamente
+                    if (photoPath && photoPath.startsWith('http')) {
+                        return photoPath;
+                    }
+
+                    // Se é um path do Storage, obtém a URL de download
+                    if (photoPath) {
+                        const photoRef = storage.refFromURL(`gs://appiluminabc.firebasestorage.app/${photoPath}`);
+                        return await photoRef.getDownloadURL();
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('Erro ao obter URL da foto:', error);
+                    return null;
+                }
+            }
+
+            // Carregar chamados do Realtime Database
+            function loadCallsData() {
+                database.ref('reports').on('value', async (snapshot) => {
+                    const callsData = snapshot.val();
+                    const calls = [];
+
+                    if (callsData) {
+                        // Usar for...of com await para processar fotos assincronamente
+                        for (const key of Object.keys(callsData)) {
+                            let call = callsData[key];
+
+                            // Verifica se problemType é array ou string
+                            let problemType = call.problemType;
+                            if (!Array.isArray(problemType)) {
+                                problemType = problemType ? [problemType] : [];
+                            }
+
+                            // Processa as fotos se existirem
+                            let photos = [];
+                            if (call.photoUrl) {
+                                // Se é uma única foto
+                                const photoUrl = await getPhotoUrlFromStorage(call.photoUrl);
+                                if (photoUrl) photos.push(photoUrl);
+                            } else if (call.photos && Array.isArray(call.photos)) {
+                                // Se são múltiplas fotos
+                                for (const photoPath of call.photos) {
+                                    const photoUrl = await getPhotoUrlFromStorage(photoPath);
+                                    if (photoUrl) photos.push(photoUrl);
+                                }
+                            }
+
+                            calls.push({
+                                id: key,
+                                ...call,
+                                problemType: problemType,
+                                type: problemType.length > 0 ? problemType[0] : 'outro',
+                                status: call.status || 'pendente',
+                                photos: photos, // Fotos processadas
+                                ledNumber: call.ledNumber || 'Não informado'
+                            });
+                        }
+                    }
+
+                    renderCalls(calls);
+                    updateDashboardCharts(calls);
+                });
+            }
+
+            function renderCalls(callsToRender) {
+                callsListContainer.innerHTML = '';
+
+                if (callsToRender.length === 0) {
+                    callsListContainer.innerHTML = '<p class="text-center text-gray-500 p-8">Nenhum chamado encontrado.</p>';
+                    return;
+                }
+
+                // Aplicar filtros
+                const selectedStatus = statusFilter.value;
+                const selectedType = typeFilter.value;
+
+                const filteredCalls = callsToRender.filter(call => {
+                    const statusMatch = selectedStatus === 'todos' || call.status === selectedStatus;
+                    const typeMatch = selectedType === 'todos' ||
+                        (call.problemType && call.problemType.some(type => type === selectedType));
+                    return statusMatch && typeMatch;
+                });
+
+                if (filteredCalls.length === 0) {
+                    callsListContainer.innerHTML = '<p class="text-center text-gray-500 p-8">Nenhum chamado encontrado com os filtros selecionados.</p>';
+                    return;
+                }
+
+                // Ordenar por data (mais recentes primeiro)
+                filteredCalls.sort((a, b) => {
+                    const dateA = new Date(a.createdAt || 0);
+                    const dateB = new Date(b.createdAt || 0);
+                    return dateB - dateA;
+                });
+
+                filteredCalls.forEach(call => {
+                    const statusInfo = statusMap[call.status] || statusMap.pendente;
+                    const callCard = document.createElement('div');
+                    callCard.className = 'call-card bg-white rounded-lg p-6 flex flex-col md:flex-row justify-between items-start md:items-center';
+                    callCard.setAttribute('data-call-id', call.id);
+
+                    // Formata os tipos de problema
+                    const formattedTypes = call.problemType ?
+                        call.problemType.join(', ') :
+                        'Tipo não especificado';
+
+                    callCard.innerHTML = `
+                        <div class="flex-grow mb-4 md:mb-0">
+                            <div class="font-bold text-gray-800 text-lg mb-1">${call.id}</div>
+                            <div class="text-sm text-gray-600 mb-1">${formattedTypes}</div>
+                            ${call.description ? `<div class="text-sm text-gray-500 mb-2">${call.description}</div>` : ''}
+                            ${call.address ? `<div class="text-sm text-gray-500 mb-1">${call.address}</div>` : ''}
+                            <div class="text-xs text-gray-500 mb-1">LED: ${call.ledNumber || 'Não informado'}</div>
+                            <div class="text-xs text-gray-400">Data: ${formatFirebaseTimestamp(call.createdAt)}</div>
+                        </div>
+                        <div class="flex flex-wrap md:flex-col items-start gap-2">
+                            <button class="status-button px-4 py-2 rounded-full text-sm font-semibold border-2 cursor-pointer transition-colors duration-200 ${statusInfo.bg} ${statusInfo.textClass} ${statusInfo.border} ${statusInfo.hover}" data-status="${call.status}">
+                                ${statusInfo.text}
+                            </button>
+                            <button class="edit-call-button px-4 py-2 rounded-full text-sm font-semibold bg-blue-100 text-blue-600 border-2 border-blue-600 cursor-pointer hover:bg-blue-200 transition-colors duration-200">
+                                <i class="fas fa-edit mr-1"></i> Editar
+                            </button>
+                            ${call.photos && call.photos.length > 0 ?
+                            `<button class="view-photos-button px-4 py-2 rounded-full text-sm font-semibold bg-purple-100 text-purple-600 border-2 border-purple-600 cursor-pointer hover:bg-purple-200 transition-colors duration-200">
+                                    <i class="fas fa-camera mr-1"></i> Fotos (${call.photos.length})
+                                </button>` : ''
+                        }
+                        </div>
+                    `;
+                    callsListContainer.appendChild(callCard);
+                });
+
+                attachStatusButtonListeners();
+                attachEditButtonListeners();
+                attachViewPhotosButtonListeners();
+            }
+
+            function attachStatusButtonListeners() {
+                document.querySelectorAll('.status-button').forEach(button => {
+                    button.addEventListener('click', async (event) => {
+                        const callId = event.target.closest('.call-card').getAttribute('data-call-id');
+                        const currentStatus = event.target.dataset.status;
+                        let newStatus;
+
+                        switch (currentStatus) {
+                            case 'concluido': newStatus = 'em-andamento'; break;
+                            case 'em-andamento': newStatus = 'pendente'; break;
+                            case 'pendente': newStatus = 'concluido'; break;
+                            default: newStatus = 'pendente';
+                        }
+
+                        try {
+                            await database.ref(`reports/${callId}`).update({ status: newStatus });
+                            showAlert('Status do chamado atualizado com sucesso!');
+                        } catch (error) {
+                            showAlert('Erro ao atualizar status: ' + error.message, 'error');
+                        }
+                    });
+                });
+            }
+
+            function attachEditButtonListeners() {
+                document.querySelectorAll('.edit-call-button').forEach(button => {
+                    button.addEventListener('click', async (event) => {
+                        const callId = event.target.closest('.call-card').getAttribute('data-call-id');
+                        const callRef = database.ref(`reports/${callId}`);
+                        const snapshot = await callRef.once('value');
+                        const callData = snapshot.val();
+
+                        if (callData) {
+                            document.getElementById('edit-call-id').value = callId;
+                            document.getElementById('edit-call-description').value = callData.description || '';
+                            document.getElementById('edit-call-address').value = callData.address || '';
+                            document.getElementById('edit-call-details').value = callData.description || '';
+                            document.getElementById('edit-call-led-number').value = callData.ledNumber || '';
+                            document.getElementById('edit-call-type').value =
+                                callData.problemType && callData.problemType.length > 0 ?
+                                    callData.problemType[0] : 'Luminária apagada';
+                            document.getElementById('edit-call-status').value = callData.status || 'pendente';
+
+                            // Carrega as fotos - AGORA CORRETAMENTE
+                            const photosContainer = document.getElementById('call-photos-container');
+                            photosContainer.innerHTML = '';
+
+                            let photos = [];
+                            if (callData.photoUrl) {
+                                // Se é uma única foto
+                                const photoUrl = await getPhotoUrlFromStorage(callData.photoUrl);
+                                if (photoUrl) photos.push(photoUrl);
+                            } else if (callData.photos && Array.isArray(callData.photos)) {
+                                // Se são múltiplas fotos
+                                for (const photoPath of callData.photos) {
+                                    const photoUrl = await getPhotoUrlFromStorage(photoPath);
+                                    if (photoUrl) photos.push(photoUrl);
+                                }
+                            }
+
+                            if (photos.length > 0) {
+                                photos.forEach((photoUrl, index) => {
+                                    const photoDiv = document.createElement('div');
+                                    photoDiv.className = 'relative';
+                                    photoDiv.innerHTML = `
+                            <img src="${photoUrl}" alt="Foto do problema ${index + 1}" 
+                                class="photo-thumbnail cursor-pointer" data-photo-url="${photoUrl}">
+                        `;
+                                    photosContainer.appendChild(photoDiv);
+                                });
+
+                                // Adiciona listeners para as fotos
+                                document.querySelectorAll('.photo-thumbnail').forEach(img => {
+                                    img.addEventListener('click', (e) => {
+                                        const url = e.target.getAttribute('data-photo-url');
+                                        modalPhoto.src = url;
+                                        photoModal.classList.remove('hidden');
+                                    });
+                                });
+                            }
+
+                            // Carrega os eletricistas para o dropdown
+                            const electricianSelect = document.getElementById('electrician-assignment');
+                            electricianSelect.innerHTML = '<option value="">Selecione um eletricista</option>';
+                            electriciansList.forEach(electrician => {
+                                const option = document.createElement('option');
+                                option.value = electrician.id;
+                                option.textContent = `${electrician.name} (${electrician.phone})`;
+                                electricianSelect.appendChild(option);
+                            });
+
+                            editCallModal.classList.remove('hidden');
+                        }
+                    });
+                });
+            }
+
+            function attachViewPhotosButtonListeners() {
+                document.querySelectorAll('.view-photos-button').forEach(button => {
+                    button.addEventListener('click', async (event) => {
+                        const callId = event.target.closest('.call-card').getAttribute('data-call-id');
+                        const callRef = database.ref(`reports/${callId}`);
+                        const snapshot = await callRef.once('value');
+                        const callData = snapshot.val();
+
+                        if (callData) {
+                            const photosContainer = document.getElementById('call-photos-container');
+                            photosContainer.innerHTML = '';
+
+                            // Processa as fotos corretamente
+                            let photos = [];
+                            if (callData.photoUrl) {
+                                // Se é uma única foto
+                                const photoUrl = await getPhotoUrlFromStorage(callData.photoUrl);
+                                if (photoUrl) photos.push(photoUrl);
+                            } else if (callData.photos && Array.isArray(callData.photos)) {
+                                // Se são múltiplas fotos
+                                for (const photoPath of callData.photos) {
+                                    const photoUrl = await getPhotoUrlFromStorage(photoPath);
+                                    if (photoUrl) photos.push(photoUrl);
+                                }
+                            }
+
+                            if (photos.length > 0) {
+                                photos.forEach((photoUrl, index) => {
+                                    const photoDiv = document.createElement('div');
+                                    photoDiv.className = 'relative';
+                                    photoDiv.innerHTML = `
+                            <img src="${photoUrl}" alt="Foto do problema ${index + 1}" 
+                                class="photo-thumbnail cursor-pointer" data-photo-url="${photoUrl}">
+                        `;
+                                    photosContainer.appendChild(photoDiv);
+                                });
+
+                                // Adiciona listeners para as fotos
+                                document.querySelectorAll('.photo-thumbnail').forEach(img => {
+                                    img.addEventListener('click', (e) => {
+                                        const url = e.target.getAttribute('data-photo-url');
+                                        modalPhoto.src = url;
+                                        photoModal.classList.remove('hidden');
+                                    });
+                                });
+
+                                // Mostra o modal
+                                document.getElementById('edit-call-id').value = callId;
+                                editCallModal.classList.remove('hidden');
+                            } else {
+                                showAlert('Este chamado não possui fotos disponíveis.', 'info');
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Fechar modal de foto
+            closePhotoModal.addEventListener('click', () => {
+                photoModal.classList.add('hidden');
+            });
+
+            // Formulário de edição de chamado
+            editCallForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const callId = document.getElementById('edit-call-id').value;
+                const updates = {
+                    description: document.getElementById('edit-call-description').value,
+                    address: document.getElementById('edit-call-address').value,
+                    problemType: [document.getElementById('edit-call-type').value],
+                    status: document.getElementById('edit-call-status').value,
+                    ledNumber: document.getElementById('edit-call-led-number').value,
+                    updatedAt: firebase.database.ServerValue.TIMESTAMP
+                };
+
+                try {
+                    await database.ref(`reports/${callId}`).update(updates);
+                    showAlert('Chamado atualizado com sucesso!');
+                    editCallModal.classList.add('hidden');
+                } catch (error) {
+                    showAlert('Erro ao atualizar chamado: ' + error.message, 'error');
+                }
+            });
+
+            // Enviar notificação para eletricista
+            sendNotificationBtn.addEventListener('click', async () => {
+                const callId = document.getElementById('edit-call-id').value;
+                const electricianId = document.getElementById('electrician-assignment').value;
+                const message = document.getElementById('notification-message').value;
+
+                if (!electricianId) {
+                    showAlert('Selecione um eletricista para enviar a notificação', 'error');
+                    return;
+                }
+
+                try {
+                    // Obtém os dados do chamado
+                    const callRef = database.ref(`reports/${callId}`);
+                    const callSnapshot = await callRef.once('value');
+                    const callData = callSnapshot.val();
+
+                    // Obtém os dados do eletricista
+                    const electricianRef = database.ref(`eletricistas/${electricianId}`);
+                    const electricianSnapshot = await electricianRef.once('value');
+                    const electricianData = electricianSnapshot.val();
+
+                    if (!electricianData) {
+                        showAlert('Eletricista não encontrado', 'error');
+                        return;
+                    }
+
+                    // Cria a notificação
+                    const notificationRef = database.ref('notificacoes').push();
+                    await notificationRef.set({
+                        callId,
+                        electricianId,
+                        electricianName: electricianData.name,
+                        electricianPhone: electricianData.phone,
+                        message: message || 'Novo chamado atribuído a você',
+                        status: 'pendente',
+                        createdAt: firebase.database.ServerValue.TIMESTAMP,
+                        callData: {
+                            address: callData.address,
+                            description: callData.description,
+                            problemType: callData.problemType,
+                            photos: callData.photos || [],
+                            ledNumber: callData.ledNumber || 'Não informado'
+                        }
+                    });
+
+                    // Atualiza o chamado com o eletricista atribuído
+                    await callRef.update({
+                        assignedTo: electricianId,
+                        assignedToName: electricianData.name,
+                        status: 'em-andamento'
+                    });
+
+                    showAlert('Notificação enviada com sucesso para o eletricista!');
+                    editCallModal.classList.add('hidden');
+                } catch (error) {
+                    showAlert('Erro ao enviar notificação: ' + error.message, 'error');
+                }
+            });
+
+            cancelEditCallBtn.addEventListener('click', () => {
+                editCallModal.classList.add('hidden');
+            });
+
+            clearConcluidosBtn.addEventListener('click', () => {
+                confirmCallsModal.classList.remove('hidden');
+            });
+
+            confirmCallsActionBtn.addEventListener('click', async () => {
+                try {
+                    const snapshot = await database.ref('reports').once('value');
+                    const callsData = snapshot.val();
+                    const updates = {};
+
+                    if (callsData) {
+                        Object.keys(callsData).forEach(key => {
+                            if (callsData[key].status === 'concluido') {
+                                updates[`reports/${key}`] = null;
+                            }
+                        });
+
+                        await database.ref().update(updates);
+                        confirmCallsModal.classList.add('hidden');
+                        showAlert('Chamados concluídos removidos com sucesso!');
+                    }
+                } catch (error) {
+                    showAlert('Erro ao remover chamados: ' + error.message, 'error');
+                }
+            });
+
+            cancelCallsActionBtn.addEventListener('click', () => {
+                confirmCallsModal.classList.add('hidden');
+            });
+
+            statusFilter.addEventListener('change', () => loadCallsData());
+            typeFilter.addEventListener('change', () => loadCallsData());
+
+            // ==================== PAINEL DE ADMINISTRADORES ====================
+            const showAddAdminButton = document.getElementById('showAddAdminForm');
+            const addAdminForm = document.getElementById('addAdminForm');
+            const cancelAddAdminButton = document.getElementById('cancelAddAdmin');
+            const adminForm = document.getElementById('adminForm');
+            const adminListContainer = document.getElementById('admin-list-container');
+            const confirmAdminsModal = document.getElementById('confirmAdminsModal');
+            const confirmDeleteButton = document.getElementById('confirmDelete');
+            const cancelDeleteButton = document.getElementById('cancelDelete');
+
+            let adminToDeleteId = null;
+
+            // Carregar administradores do Realtime Database
+            function loadAdminData() {
+                database.ref('administradores').on('value', (snapshot) => {
+                    const adminsData = snapshot.val();
+                    const admins = [];
+
+                    if (adminsData) {
+                        Object.keys(adminsData).forEach(key => {
+                            admins.push({ id: key, ...adminsData[key] });
+                        });
+                    }
+
+                    renderAdminList(admins);
+                });
+            }
+
+            function renderAdminList(admins) {
+                adminListContainer.innerHTML = '';
+
+                if (admins.length === 0) {
+                    adminListContainer.innerHTML = '<p class="text-center text-gray-500">Nenhum administrador cadastrado.</p>';
+                    return;
+                }
+
+                // Ordenar por data de criação (mais recentes primeiro)
+                admins.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+                admins.forEach(admin => {
+                    const adminItem = document.createElement('div');
+                    adminItem.className = 'flex items-center justify-between p-4 border-b border-gray-200 last:border-b-0';
+
+                    adminItem.innerHTML = `
+                        <div>
+                            <div class="font-bold text-gray-800">${admin.name}</div>
+                            <div class="text-sm text-gray-500">${admin.email}</div>
+                            <span class="admin-badge ${admin.role === 'super' ? 'super-admin' : 'normal-admin'}">
+                                ${admin.role === 'super' ? 'Super Admin' : 'Admin Normal'}
+                            </span>
+                        </div>
+                        ${currentUserRole === 'super' && admin.email !== "admin@iluminabc.com" ?
+                            `<button class="delete-admin-button bg-red-500 text-white py-2 px-4 rounded-full font-medium hover:bg-red-600 transition-colors duration-300" data-id="${admin.id}">
+                                Excluir
+                            </button>` :
+                            `<span class="text-gray-400 text-sm">${admin.email === "admin@iluminabc.com" ? "Admin padrão" : "Sem permissão"}</span>`
+                        }
+                    `;
+
+                    adminListContainer.appendChild(adminItem);
+                });
+
+                // Adicionar listeners para os botões de exclusão
+                document.querySelectorAll('.delete-admin-button').forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        adminToDeleteId = event.target.dataset.id;
+                        confirmAdminsModal.classList.remove('hidden');
+                    });
+                });
+            }
+
+            confirmDeleteButton.addEventListener('click', async () => {
+                if (adminToDeleteId) {
+                    try {
+                        // Primeiro, remove o usuário do Authentication
+                        const adminRef = database.ref(`administradores/${adminToDeleteId}`);
+                        const snapshot = await adminRef.once('value');
+                        const adminData = snapshot.val();
+
+                        if (adminData) {
+                            try {
+                                // Tenta encontrar e remover o usuário do Authentication
+                                const user = await auth.getUserByEmail(adminData.email);
+                                await auth.deleteUser(user.uid);
+                            } catch (error) {
+                                console.warn("Não foi possível remover usuário do Authentication:", error);
+                            }
+
+                            // Remove do Realtime Database
+                            await adminRef.remove();
+
+                            showAlert('Administrador excluído com sucesso!');
+                        }
+                    } catch (error) {
+                        showAlert('Erro ao excluir administrador: ' + error.message, 'error');
+                    }
+                    confirmAdminsModal.classList.add('hidden');
+                    adminToDeleteId = null;
+                }
+            });
+
+            cancelDeleteButton.addEventListener('click', () => {
+                confirmAdminsModal.classList.add('hidden');
+                adminToDeleteId = null;
+            });
+
+            showAddAdminButton.addEventListener('click', () => {
+                if (currentUserRole === 'super') {
+                    addAdminForm.classList.remove('hidden');
+                    showAddAdminButton.classList.add('hidden');
+                } else {
+                    showAlert('Apenas Super Administradores podem adicionar novos administradores', 'error');
+                }
+            });
+
+            cancelAddAdminButton.addEventListener('click', () => {
+                addAdminForm.classList.add('hidden');
+                showAddAdminButton.classList.remove('hidden');
+                adminForm.reset();
+            });
+
+            adminForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                const name = document.getElementById('admin-name').value;
+                const email = document.getElementById('admin-email').value;
+                const password = document.getElementById('admin-password').value;
+                const role = document.getElementById('admin-role').value;
+
+                if (name && email && password) {
+                    try {
+                        // Cria o usuário no Authentication
+                        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+
+                        // Adiciona os dados do administrador no Realtime Database
+                        const newAdminRef = database.ref('administradores').push();
+                        await newAdminRef.set({
+                            name,
+                            email,
+                            role,
+                            createdAt: firebase.database.ServerValue.TIMESTAMP
+                        });
+
+                        showAlert('Novo administrador adicionado com sucesso!');
+                        adminForm.reset();
+                        addAdminForm.classList.add('hidden');
+                        showAddAdminButton.classList.remove('hidden');
+                    } catch (error) {
+                        showAlert('Erro ao adicionar administrador: ' + error.message, 'error');
+                    }
+                } else {
+                    showAlert('Por favor, preencha todos os campos.', 'error');
+                }
+            });
+
+            // ==================== PAINEL DE ELETRICISTAS ====================
+            const showAddElectricianButton = document.getElementById('showAddElectricianForm');
+            const addElectricianForm = document.getElementById('addElectricianForm');
+            const cancelAddElectricianButton = document.getElementById('cancelAddElectrician');
+            const electricianForm = document.getElementById('electricianForm');
+            const electricianListContainer = document.getElementById('electrician-list-container');
+            const confirmElectriciansModal = document.getElementById('confirmElectriciansModal');
+            const confirmElectricianDeleteButton = document.getElementById('confirmElectricianDelete');
+            const cancelElectricianDeleteButton = document.getElementById('cancelElectricianDelete');
+
+            let electricianToDeleteId = null;
+
+            // Carregar eletricistas do Realtime Database
+            function loadElectriciansData() {
+                database.ref('eletricistas').on('value', (snapshot) => {
+                    const electriciansData = snapshot.val();
+                    electriciansList = [];
+
+                    if (electriciansData) {
+                        Object.keys(electriciansData).forEach(key => {
+                            electriciansList.push({ id: key, ...electriciansData[key] });
+                        });
+                    }
+
+                    renderElectricianList(electriciansList);
+                });
+            }
+
+            function renderElectricianList(electricians) {
+                electricianListContainer.innerHTML = '';
+
+                if (electricians.length === 0) {
+                    electricianListContainer.innerHTML = '<p class="text-center text-gray-500">Nenhum eletricista cadastrado.</p>';
+                    return;
+                }
+
+                // Ordenar por data de criação (mais recentes primeiro)
+                electricians.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+                electricians.forEach(electrician => {
+                    const electricianItem = document.createElement('div');
+                    electricianItem.className = 'flex items-center justify-between p-4 border-b border-gray-200 last:border-b-0';
+
+                    electricianItem.innerHTML = `
+                        <div>
+                            <div class="font-bold text-gray-800">${electrician.name}</div>
+                            <div class="text-sm text-gray-500">${electrician.email}</div>
+                            <div class="text-sm text-gray-500">${electrician.phone}</div>
+                        </div>
+                        ${currentUserRole === 'super' ?
+                            `<button class="delete-electrician-button bg-red-500 text-white py-2 px-4 rounded-full font-medium hover:bg-red-600 transition-colors duration-300" data-id="${electrician.id}">
+                                Excluir
+                            </button>` :
+                            `<span class="text-gray-400 text-sm">Sem permissão</span>`
+                        }
+                    `;
+
+                    electricianListContainer.appendChild(electricianItem);
+                });
+
+                // Adicionar listeners para os botões de exclusão
+                document.querySelectorAll('.delete-electrician-button').forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        electricianToDeleteId = event.target.dataset.id;
+                        confirmElectriciansModal.classList.remove('hidden');
+                    });
+                });
+            }
+
+            confirmElectricianDeleteButton.addEventListener('click', async () => {
+                if (electricianToDeleteId) {
+                    try {
+                        // Primeiro, remove o usuário do Authentication
+                        const electricianRef = database.ref(`eletricistas/${electricianToDeleteId}`);
+                        const snapshot = await electricianRef.once('value');
+                        const electricianData = snapshot.val();
+
+                        if (electricianData) {
+                            try {
+                                // Tenta encontrar e remover o usuário do Authentication
+                                const user = await auth.getUserByEmail(electricianData.email);
+                                await auth.deleteUser(user.uid);
+                            } catch (error) {
+                                console.warn("Não foi possível remover usuário do Authentication:", error);
+                            }
+
+                            // Remove do Realtime Database
+                            await electricianRef.remove();
+
+                            showAlert('Eletricista excluído com sucesso!');
+                        }
+                    } catch (error) {
+                        showAlert('Erro ao excluir eletricista: ' + error.message, 'error');
+                    }
+                    confirmElectriciansModal.classList.add('hidden');
+                    electricianToDeleteId = null;
+                }
+            });
+
+            cancelElectricianDeleteButton.addEventListener('click', () => {
+                confirmElectriciansModal.classList.add('hidden');
+                electricianToDeleteId = null;
+            });
+
+            showAddElectricianButton.addEventListener('click', () => {
+                if (currentUserRole === 'super') {
+                    addElectricianForm.classList.remove('hidden');
+                    showAddElectricianButton.classList.add('hidden');
+                } else {
+                    showAlert('Apenas Super Administradores podem acessar esta área', 'error');
+                }
+            });
+
+            cancelAddElectricianButton.addEventListener('click', () => {
+                addElectricianForm.classList.add('hidden');
+                showAddElectricianButton.classList.remove('hidden');
+                electricianForm.reset();
+            });
+
+            electricianForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                const name = document.getElementById('electrician-name').value;
+                const email = document.getElementById('electrician-email').value;
+                const phone = document.getElementById('electrician-phone').value;
+                const password = document.getElementById('electrician-password').value;
+
+                if (name && email && phone && password) {
+                    try {
+                        // Cria o usuário no Authentication
+                        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+
+                        // Adiciona os dados do eletricista no Realtime Database
+                        const newElectricianRef = database.ref('eletricistas').push();
+                        await newElectricianRef.set({
+                            name,
+                            email,
+                            phone,
+                            createdAt: firebase.database.ServerValue.TIMESTAMP
+                        });
+
+                        showAlert('Novo eletricista adicionado com sucesso!');
+                        electricianForm.reset();
+                        addElectricianForm.classList.add('hidden');
+                        showAddElectricianButton.classList.remove('hidden');
+                    } catch (error) {
+                        showAlert('Erro ao adicionar eletricista: ' + error.message, 'error');
+                    }
+                } else {
+                    showAlert('Por favor, preencha todos os campos.', 'error');
+                }
+            });
+
+            // ==================== DASHBOARD ====================
+            function updateDashboardCharts(calls) {
+                if (!calls) return;
+
+                // Dados para gráfico de status
+                const statusCounts = {
+                    concluido: calls.filter(c => c.status === 'concluido').length,
+                    'em-andamento': calls.filter(c => c.status === 'em-andamento').length,
+                    'pendente': calls.filter(c => c.status === 'pendente').length
+                };
+
+                // Dados para gráfico de tipos
+                const typeCounts = {};
+                const allTypes = [
+                    'Luminária apagada', 'Luminária piscando', 'Luminária acesa 24h',
+                    'Luminária quebrada', 'Suporte da Luminária quebrado',
+                    'Luminária sem alimentação elétrica', 'Poste sem Luminária',
+                    'Poste sem rede de baixa tensão', 'Rua escura', 'Rua sem Poste'
+                ];
+
+                // Inicializa todos os tipos com 0
+                allTypes.forEach(type => {
+                    typeCounts[type] = 0;
+                });
+
+                // Conta os tipos reais
+                calls.forEach(call => {
+                    if (call.problemType) {
+                        call.problemType.forEach(type => {
+                            if (typeCounts[type] !== undefined) {
+                                typeCounts[type]++;
+                            } else {
+                                typeCounts[type] = 1;
+                            }
+                        });
+                    }
+                });
+
+                // Filtra apenas os tipos com ocorrências
+                const filteredTypeCounts = {};
+                Object.keys(typeCounts).forEach(type => {
+                    if (typeCounts[type] > 0) {
+                        filteredTypeCounts[type] = typeCounts[type];
+                    }
+                });
+
+                // Atualizar ou criar gráfico de status
+                const statusCtx = document.getElementById('statusChart').getContext('2d');
+                if (statusChart) {
+                    statusChart.data.datasets[0].data = Object.values(statusCounts);
+                    statusChart.update();
+                } else {
+                    statusChart = new Chart(statusCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Concluídos', 'Em andamento', 'Pendentes'],
+                            datasets: [{
+                                data: Object.values(statusCounts),
+                                backgroundColor: [
+                                    '#10B981', // verde
+                                    '#F59E0B', // amarelo
+                                    '#EF4444'  // vermelho
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Atualizar ou criar gráfico de tipos
+                const typeCtx = document.getElementById('typeChart').getContext('2d');
+                if (typeChart) {
+                    typeChart.data.labels = Object.keys(filteredTypeCounts);
+                    typeChart.data.datasets[0].data = Object.values(filteredTypeCounts);
+                    typeChart.update();
+                } else {
+                    typeChart = new Chart(typeCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(filteredTypeCounts),
+                            datasets: [{
+                                label: 'Quantidade',
+                                data: Object.values(filteredTypeCounts),
+                                backgroundColor: [
+                                    '#3B82F6', '#8B5CF6', '#EC4899', '#10B981',
+                                    '#F59E0B', '#EF4444', '#6366F1', '#F97316',
+                                    '#14B8A6', '#84CC16'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Atualizar atividades recentes
+                const recentActivityContainer = document.getElementById('recent-activity');
+                recentActivityContainer.innerHTML = '';
+
+                // Ordenar chamados por data (mais recentes primeiro)
+                const sortedCalls = [...calls].sort((a, b) => {
+                    const dateA = new Date(a.createdAt || 0);
+                    const dateB = new Date(b.createdAt || 0);
+                    return dateB - dateA;
+                }).slice(0, 5); // Pegar apenas os 5 mais recentes
+
+                if (sortedCalls.length === 0) {
+                    recentActivityContainer.innerHTML = '<p class="text-center text-gray-500">Nenhuma atividade recente</p>';
+                    return;
+                }
+
+                sortedCalls.forEach(call => {
+                    const statusInfo = statusMap[call.status] || statusMap.pendente;
+                    const activityItem = document.createElement('div');
+                    activityItem.className = 'flex items-start border-b border-gray-200 pb-4 last:border-b-0';
+
+                    const problemTypes = call.problemType ? call.problemType.join(', ') : 'Tipo não especificado';
+
+                    activityItem.innerHTML = `
+                        <div class="flex-shrink-0 mr-3">
+                            <span class="${statusInfo.bg} ${statusInfo.textClass} ${statusInfo.border} px-2 py-1 rounded-full text-xs font-semibold">
+                                ${statusInfo.text}
+                            </span>
+                        </div>
+                        <div class="flex-grow">
+                            <div class="font-medium text-gray-800">${call.id}</div>
+                            <div class="text-sm text-gray-500">${problemTypes}</div>
+                            ${call.description ? `<div class="text-sm text-gray-500 mt-1">${call.description}</div>` : ''}
+                            <div class="text-xs text-gray-500 mt-1">LED: ${call.ledNumber || 'Não informado'}</div>
+                            <div class="text-xs text-gray-400 mt-1">${formatFirebaseTimestamp(call.createdAt)}</div>
+                        </div>
+                    `;
+
+                    recentActivityContainer.appendChild(activityItem);
+                });
+            }
+
+            // Função para formatar timestamp do Firebase
+            function formatFirebaseTimestamp(timestamp) {
+                if (!timestamp) return 'Data desconhecida';
+
+                const date = new Date(timestamp);
+                return date.toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

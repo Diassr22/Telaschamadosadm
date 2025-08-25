@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Paineladm</string>
+    <string name="title_activity_main">Paineladm</string>
+    <string name="package_name">com.telaadm.app</string>
+    <string name="custom_url_scheme">com.telaadm.app</string>
+</resources>
